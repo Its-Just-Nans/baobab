@@ -1,0 +1,40 @@
+[package]
+name = "baobab"
+version = "0.1.0"
+authors = ["n4n5 <its.just.n4n5@gmail.com>"]
+description = "boa_cli in egui"
+edition = "2021"
+include = ["LICENSE-APACHE", "LICENSE-MIT", "**/*.rs", "Cargo.toml"]
+license = "MIT"
+license-file = "LICENSE"
+rust-version = "1.83"
+documentation = "https://doc.rs/baobab"
+repository = "https://github.com/Its-Just-Nans/baobab"
+
+[package.metadata.docs.rs]
+all-features = true
+
+[dependencies]
+egui = "0.30"
+eframe = { version = "0.30", default-features = false, features = [
+    "accesskit",     # Make egui compatible with screen readers. NOTE: adds a lot of dependencies.
+    "default_fonts", # Embed the default egui fonts.
+    "glow",          # Use the glow rendering backend. Alternative: "wgpu".
+    "persistence",   # Enable restoring app state when restarting the app.
+    "x11",           # To support Linux (and CI)
+    "wayland",       # To support Linux (and CI)
+] }
+log = "0.4"
+
+# You only need serde if you want app persistence:
+serde = { version = "1", features = ["derive"] }
+boa_engine = "0.20.0"
+tokio = "1.43.0"
+env_logger = "0.11"
+
+[profile.release]
+opt-level = 2 # fast and small wasm
+
+# Optimize all dependencies even in debug builds:
+[profile.dev.package."*"]
+opt-level = 2
