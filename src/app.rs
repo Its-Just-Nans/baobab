@@ -6,7 +6,7 @@ pub enum SendType {
     Quit,
 }
 
-pub struct TemplateApp {
+pub struct BaobabApp {
     // Example stuff:
     value: String,
     old_values: Vec<SendType>,
@@ -14,7 +14,7 @@ pub struct TemplateApp {
     recv_res: Receiver<SendType>,
 }
 
-impl TemplateApp {
+impl BaobabApp {
     pub fn new(
         cc: &eframe::CreationContext<'_>,
         send_js: Sender<SendType>,
@@ -38,7 +38,7 @@ impl TemplateApp {
     }
 }
 
-impl eframe::App for TemplateApp {
+impl eframe::App for BaobabApp {
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
         eframe::set_value(storage, eframe::APP_KEY, &self.value);
     }

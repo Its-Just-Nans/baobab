@@ -39,9 +39,9 @@ fn main() -> eframe::Result {
         ..Default::default()
     };
     let _ = eframe::run_native(
-        "eframe template",
+        "baobab",
         native_options,
-        Box::new(|cc| Ok(Box::new(baobab::TemplateApp::new(cc, send_js, recv_red)))),
+        Box::new(|cc| Ok(Box::new(baobab::BaobabApp::new(cc, send_js, recv_red)))),
     );
     receiver.join().expect("The receiver thread has panicked");
 

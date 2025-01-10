@@ -1,6 +1,6 @@
 [package]
 name = "baobab"
-version = "0.1.0"
+version = "1.0.0"
 authors = ["n4n5 <its.just.n4n5@gmail.com>"]
 description = "boa_cli in egui"
 edition = "2021"
