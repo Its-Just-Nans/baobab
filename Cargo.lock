@@ -520,7 +520,7 @@ dependencies = [
 
 [[package]]
 name = "baobab"
-version = "1.0.1"
+version = "1.0.2"
 dependencies = [
  "boa_engine",
  "eframe",
