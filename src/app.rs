@@ -1,5 +1,6 @@
 use std::sync::mpsc::{Receiver, Sender};
 
+#[derive(Debug)]
 pub enum SendType {
     Code(String),
     Result(String),
@@ -78,6 +79,13 @@ impl eframe::App for BaobabApp {
                         .send(SendType::Code(self.value.clone()))
                         .unwrap();
                     self.value.clear();
+                }
+                if ui.input(|i| i.key_pressed(egui::Key::ArrowUp)) {
+                    if let Some(SendType::Code(s)) =
+                        self.old_values.get(self.old_values.len().wrapping_sub(2))
+                    {
+                        self.value = s.to_string().replace(">> ", "");
+                    }
                 }
                 self.recv_res.try_iter().for_each(|v| {
                     self.old_values.push(v);

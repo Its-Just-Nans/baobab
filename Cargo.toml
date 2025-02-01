@@ -1,12 +1,11 @@
 [package]
 name = "baobab"
-version = "1.0.0"
+version = "1.0.1"
 authors = ["n4n5 <its.just.n4n5@gmail.com>"]
 description = "boa_cli in egui"
 edition = "2021"
 include = ["LICENSE-APACHE", "LICENSE-MIT", "**/*.rs", "Cargo.toml"]
 license = "MIT"
-license-file = "LICENSE"
 rust-version = "1.83"
 documentation = "https://doc.rs/baobab"
 repository = "https://github.com/Its-Just-Nans/baobab"
