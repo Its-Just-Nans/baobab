@@ -86,6 +86,15 @@ impl eframe::App for BaobabApp {
                     {
                         self.value = s.to_string().replace(">> ", "");
                     }
+                    let text_edit_id = wid.id;
+                    if let Some(mut state) = egui::TextEdit::load_state(ui.ctx(), text_edit_id) {
+                        let ccursor = egui::text::CCursor::new(self.value.chars().count());
+                        state
+                            .cursor
+                            .set_char_range(Some(egui::text::CCursorRange::one(ccursor)));
+                        state.store(ui.ctx(), text_edit_id);
+                        ui.ctx().memory_mut(|mem| mem.request_focus(text_edit_id));
+                    }
                 }
                 self.recv_res.try_iter().for_each(|v| {
                     self.old_values.push(v);
