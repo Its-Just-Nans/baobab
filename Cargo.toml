@@ -1,12 +1,14 @@
 [package]
 name = "baobab"
-version = "1.0.3"
+version = "1.1.0"
 authors = ["n4n5 <its.just.n4n5@gmail.com>"]
 description = "boa_cli in egui"
-edition = "2021"
+edition = "2024"
 include = ["LICENSE-APACHE", "LICENSE-MIT", "**/*.rs", "Cargo.toml"]
+categories = ["gui", "command-line-interface"]
+keywords = ["egui", "js", "boa-cli", "keyboard-shortcuts"]
 license = "MIT"
-rust-version = "1.83"
+rust-version = "1.91"
 documentation = "https://docs.rs/baobab"
 repository = "https://github.com/Its-Just-Nans/baobab"
 
@@ -14,8 +16,7 @@ repository = "https://github.com/Its-Just-Nans/baobab"
 all-features = true
 
 [dependencies]
-egui = "0.30"
-eframe = { version = "0.30", default-features = false, features = [
+eframe = { version = "0.33", default-features = false, features = [
     "accesskit",     # Make egui compatible with screen readers. NOTE: adds a lot of dependencies.
     "default_fonts", # Embed the default egui fonts.
     "glow",          # Use the glow rendering backend. Alternative: "wgpu".
@@ -27,8 +28,8 @@ log = "0.4"
 
 # You only need serde if you want app persistence:
 serde = { version = "1", features = ["derive"] }
-boa_engine = "0.20.0"
-tokio = "1.43.0"
+boa_engine = "0.21.0"
+tokio = "1.48.0"
 env_logger = "0.11"
 
 [profile.release]

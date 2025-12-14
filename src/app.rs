@@ -1,21 +1,33 @@
+//! Baobab App Ui
+
+use eframe::egui;
 use std::sync::mpsc::{Receiver, Sender};
 
+/// Types of messages sent between UI and JS engine
 #[derive(Debug)]
 pub enum SendType {
+    /// Send Code as string to evaluate
     Code(String),
+    /// Result from evaluation
     Result(String),
+    /// Quit signal
     Quit,
 }
 
+/// The Baobab App
 pub struct BaobabApp {
-    // Example stuff:
+    /// Current value
     value: String,
+    /// Previous values
     old_values: Vec<SendType>,
+    /// Sender to JS engine
     send_js: Sender<SendType>,
+    /// Receiver from JS engine
     recv_res: Receiver<SendType>,
 }
 
 impl BaobabApp {
+    /// Create a new Baobab App
     pub fn new(
         cc: &eframe::CreationContext<'_>,
         send_js: Sender<SendType>,
@@ -49,7 +61,7 @@ impl eframe::App for BaobabApp {
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             // The top panel is often a good place for a menu bar:
 
-            egui::menu::bar(ui, |ui| {
+            egui::MenuBar::new().ui(ui, |ui| {
                 // NOTE: no File->Quit on web pages!
                 let is_web = cfg!(target_arch = "wasm32");
                 if !is_web {
@@ -75,9 +87,9 @@ impl eframe::App for BaobabApp {
                         ">>",
                         self.value.clone()
                     )));
-                    self.send_js
-                        .send(SendType::Code(self.value.clone()))
-                        .unwrap();
+                    if let Err(e) = self.send_js.send(SendType::Code(self.value.clone())) {
+                        eprintln!("Failed to send code to JS engine: {}", e);
+                    }
                     self.value.clear();
                 }
                 if ui.input(|i| i.key_pressed(egui::Key::ArrowUp)) {
