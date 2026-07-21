@@ -4,6 +4,5 @@
 use baobab::run_baobab;
 
 fn main() -> Result<(), String> {
-    env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
     run_baobab().map_err(|e| e.to_string())
 }

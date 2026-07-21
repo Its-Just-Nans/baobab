@@ -1,7 +1,6 @@
 //! Baobab App Ui
 
 use eframe::egui;
-use std::sync::mpsc::{Receiver, Sender};
 
 /// Types of messages sent between UI and JS engine
 #[derive(Debug)]
@@ -21,18 +20,33 @@ pub struct BaobabApp {
     /// Previous values
     old_values: Vec<SendType>,
     /// Sender to JS engine
-    send_js: Sender<SendType>,
     /// Receiver from JS engine
-    recv_res: Receiver<SendType>,
+    #[cfg(target_arch = "wasm32")]
+    channels: (Option<SendType>, Option<SendType>),
+    /// Sender to JS engine
+    /// Receiver from JS engine
+    #[cfg(not(target_arch = "wasm32"))]
+    channels: (
+        std::sync::mpsc::Sender<SendType>,
+        std::sync::mpsc::Receiver<SendType>,
+    ),
+    /// JS context
+    #[cfg(target_arch = "wasm32")]
+    context: boa_engine::Context,
 }
 
 impl BaobabApp {
     /// Create a new Baobab App
-    pub fn new(
+    /// # Errors
+    /// Can fail on wasm
+    pub fn try_new(
         cc: &eframe::CreationContext<'_>,
-        send_js: Sender<SendType>,
-        recv_res: Receiver<SendType>,
-    ) -> Self {
+        #[cfg(not(target_arch = "wasm32"))] channels: (
+            std::sync::mpsc::Sender<SendType>,
+            std::sync::mpsc::Receiver<SendType>,
+        ),
+        #[cfg(target_arch = "wasm32")] channels: (Option<SendType>, Option<SendType>),
+    ) -> Result<Self, String> {
         // This is also where you can customize the look and feel of egui using
         // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
 
@@ -42,11 +56,118 @@ impl BaobabApp {
             Some(store) => eframe::get_value::<String>(store, eframe::APP_KEY),
             _ => None,
         };
-        Self {
+        #[cfg(target_arch = "wasm32")]
+        let context = boa_engine::Context::builder()
+            .build()
+            .map_err(|e| format!("Failed to create Boa Context: {}", e))?;
+        Ok(Self {
             old_values: Default::default(),
             value: saved.unwrap_or_default(),
-            send_js,
-            recv_res,
+            #[cfg(target_arch = "wasm32")]
+            context,
+            channels,
+        })
+    }
+
+    /// Send a command
+    pub(crate) fn send_command(&mut self, value: SendType) -> Result<(), String> {
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            if let Err(e) = self.channels.0.send(value) {
+                return Err(format!("Failed to send code to JS engine: {}", e));
+            }
+            Ok(())
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            self.channels.0 = Some(value);
+            Ok(())
+        }
+    }
+
+    /// Receive a command
+    #[cfg(target_arch = "wasm32")]
+    pub(crate) fn receive_command(&mut self) -> Option<SendType> {
+        self.channels.0.take()
+    }
+
+    /// Send a result
+    #[cfg(target_arch = "wasm32")]
+    pub(crate) fn send_result(&mut self, value: SendType) -> Result<(), String> {
+        self.channels.1 = Some(value);
+        Ok(())
+    }
+
+    /// receive a result
+    pub(crate) fn receive_result(&mut self) -> Option<SendType> {
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            self.channels.1.try_recv().ok()
+        }
+        #[cfg(target_arch = "wasm32")]
+        self.channels.1.take()
+    }
+
+    /// Run the baobab background thread
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(crate) fn run_baobab_thread(
+        recv_js: std::sync::mpsc::Receiver<SendType>,
+        send_res: std::sync::mpsc::Sender<SendType>,
+    ) -> std::thread::JoinHandle<Result<(), std::io::Error>> {
+        use boa_engine::{Context, Source};
+        /// Run the Baobab JS engine thread
+        use std::thread;
+        thread::spawn(move || {
+            let mut context = Context::builder().build().map_err(|e| {
+                std::io::Error::other(format!("Failed to create Boa Context: {}", e))
+            })?;
+            while let Ok(sent) = recv_js.recv() {
+                match sent {
+                    SendType::Quit => break,
+                    SendType::Code(codeline) => {
+                        let val = match context.eval(Source::from_bytes(&codeline)) {
+                            Ok(res) => {
+                                format!("{}", res.display())
+                            }
+                            Err(e) => e.to_string(),
+                        };
+                        send_res.send(SendType::Result(val)).map_err(|e| {
+                            std::io::Error::other(format!(
+                                "Failed to send result back to main thread: {}",
+                                e
+                            ))
+                        })?;
+                    }
+                    _ => continue,
+                }
+            }
+            Ok(())
+        })
+    }
+
+    /// run the baobab in wasm
+    #[cfg(target_arch = "wasm32")]
+    pub(crate) fn run_baobab(&mut self, ctx: egui::Context) {
+        let Some(value) = self.receive_command() else {
+            return;
+        };
+        let context = &mut self.context;
+        match value {
+            SendType::Quit => {
+                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+            }
+            SendType::Code(codeline) => {
+                let val = match context.eval(boa_engine::Source::from_bytes(&codeline)) {
+                    Ok(res) => {
+                        format!("{}", res.display())
+                    }
+                    Err(e) => e.to_string(),
+                };
+                if let Err(_e) = self.send_result(SendType::Result(val)) {
+                    // TODO handle
+                }
+            }
+            _ => {}
         }
     }
 }
@@ -87,8 +208,8 @@ impl eframe::App for BaobabApp {
                         ">>",
                         self.value.clone()
                     )));
-                    if let Err(e) = self.send_js.send(SendType::Code(self.value.clone())) {
-                        eprintln!("Failed to send code to JS engine: {}", e);
+                    if let Err(_e) = self.send_command(SendType::Code(self.value.clone())) {
+                        //TODO handle error
                     }
                     self.value.clear();
                 }
@@ -108,9 +229,9 @@ impl eframe::App for BaobabApp {
                         ui.ctx().memory_mut(|mem| mem.request_focus(text_edit_id));
                     }
                 }
-                self.recv_res.try_iter().for_each(|v| {
-                    self.old_values.push(v);
-                });
+                if let Some(result) = self.receive_result() {
+                    self.old_values.push(result);
+                }
                 wid.request_focus();
             });
         });
@@ -132,5 +253,7 @@ impl eframe::App for BaobabApp {
                 });
             });
         });
+        #[cfg(target_arch = "wasm32")]
+        self.run_baobab(ctx.clone());
     }
 }

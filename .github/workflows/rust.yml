@@ -1,6 +1,6 @@
 on: [push, pull_request, workflow_dispatch]
 
-name: CI
+name: basic CI workflows
 
 env:
     RUSTFLAGS: -D warnings
@@ -11,7 +11,7 @@ jobs:
         name: Check
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v6
             - uses: actions-rs/toolchain@v1
               with:
                   profile: minimal
@@ -21,11 +21,28 @@ jobs:
               with:
                   command: check
                   args: --all-features
+
+    check_wasm:
+        name: Check wasm32
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v6
+            - uses: actions-rs/toolchain@v1
+              with:
+                  profile: minimal
+                  toolchain: stable
+                  target: wasm32-unknown-unknown
+                  override: true
+            - uses: actions-rs/cargo@v1
+              with:
+                  command: check
+                  args: --all-features --lib --target wasm32-unknown-unknown
+
     test:
         name: Test Suite
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v6
             - uses: actions-rs/toolchain@v1
               with:
                   profile: minimal
@@ -41,7 +58,7 @@ jobs:
         name: Rustfmt
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v6
             - uses: actions-rs/toolchain@v1
               with:
                   profile: minimal
@@ -57,7 +74,7 @@ jobs:
         name: Clippy
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v6
             - uses: actions-rs/toolchain@v1
               with:
                   profile: minimal
@@ -67,4 +84,71 @@ jobs:
             - uses: actions-rs/cargo@v1
               with:
                   command: clippy
-                  args: -- -A warnings
+                  args: -- -D warnings
+
+    trunk:
+        name: trunk
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v6
+            - uses: actions-rs/toolchain@v1
+              with:
+                  profile: minimal
+                  toolchain: 1.94
+                  target: wasm32-unknown-unknown
+                  override: true
+            - name: Download and install Trunk binary
+              run: wget -qO- https://github.com/thedodd/trunk/releases/latest/download/trunk-x86_64-unknown-linux-gnu.tar.gz | tar -xzf-
+            - name: Build
+              run: ./trunk build
+
+    build:
+        if: contains(join(github.event.commits.*.modified, ' '), 'Cargo.toml') || contains(join(github.event.commits.*.added, ' '), 'Cargo.toml')
+        runs-on: ${{ matrix.os }}
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - os: macos-latest
+                      TARGET: aarch64-apple-darwin
+
+                    - os: macos-latest
+                      TARGET: x86_64-apple-darwin
+
+                    - os: ubuntu-latest
+                      TARGET: arm-unknown-linux-musleabihf
+
+                    - os: ubuntu-latest
+                      TARGET: armv7-unknown-linux-musleabihf
+
+                    - os: ubuntu-latest
+                      TARGET: x86_64-unknown-linux-musl
+
+                    - os: windows-latest
+                      TARGET: x86_64-pc-windows-msvc
+                      EXTENSION: .exe
+
+        steps:
+            - name: Building ${{ matrix.TARGET }}
+              run: echo "${{ matrix.TARGET }}"
+
+            - uses: actions/checkout@v6
+            - uses: actions-rs/toolchain@v1.0.1
+              with:
+                  toolchain: stable
+                  target: ${{ matrix.TARGET }}
+                  override: true
+
+            - uses: actions-rs/cargo@v1
+              with:
+                  use-cross: true
+                  command: build
+                  args: --verbose --release --target=${{ matrix.TARGET }}
+
+            - name: Rename
+              run: cp target/${{ matrix.TARGET }}/release/${{ github.event.repository.name }}${{ matrix.EXTENSION }} ${{ github.event.repository.name }}-${{ matrix.TARGET }}${{ matrix.EXTENSION }}
+
+            - uses: actions/upload-artifact@main
+              with:
+                  name: ${{ github.event.repository.name }}-${{ matrix.TARGET }}${{ matrix.EXTENSION }}
+                  path: ${{ github.event.repository.name }}-${{ matrix.TARGET }}${{ matrix.EXTENSION }}
