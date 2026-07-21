@@ -65,7 +65,7 @@ pub fn run_baobab() -> Result<(), std::io::Error> {
 
     let web_options = eframe::WebOptions::default();
     wasm_bindgen_futures::spawn_local(async {
-        let document = web_sys::window()
+        let document = eframe::web_sys::window()
             .expect("No window")
             .document()
             .expect("No document");
@@ -73,7 +73,7 @@ pub fn run_baobab() -> Result<(), std::io::Error> {
         let canvas = document
             .get_element_by_id("the_canvas_id")
             .expect("Failed to find the_canvas_id")
-            .dyn_into::<web_sys::HtmlCanvasElement>()
+            .dyn_into::<eframe::web_sys::HtmlCanvasElement>()
             .expect("the_canvas_id was not a HtmlCanvasElement");
         log::error!("sdqfsd");
 
