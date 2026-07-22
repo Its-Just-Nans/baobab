@@ -1,9 +1,13 @@
 //! Baobab App Ui
 
-use eframe::egui;
+use bladvak::BladvakApp;
+#[cfg(target_arch = "wasm32")]
+use bladvak::ErrorManager;
+use bladvak::eframe;
+use bladvak::eframe::egui;
 
 /// Types of messages sent between UI and JS engine
-#[derive(Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub enum SendType {
     /// Send Code as string to evaluate
     Code(String),
@@ -14,6 +18,7 @@ pub enum SendType {
 }
 
 /// The Baobab App
+#[derive(serde::Serialize, serde::Deserialize, Debug, Default)]
 pub struct BaobabApp {
     /// Current value
     value: String,
@@ -22,58 +27,31 @@ pub struct BaobabApp {
     /// Sender to JS engine
     /// Receiver from JS engine
     #[cfg(target_arch = "wasm32")]
+    #[serde(skip)]
     channels: (Option<SendType>, Option<SendType>),
     /// Sender to JS engine
     /// Receiver from JS engine
     #[cfg(not(target_arch = "wasm32"))]
-    channels: (
+    #[serde(skip)]
+    channels: Option<(
         std::sync::mpsc::Sender<SendType>,
         std::sync::mpsc::Receiver<SendType>,
-    ),
+    )>,
     /// JS context
     #[cfg(target_arch = "wasm32")]
+    #[serde(skip)]
     context: boa_engine::Context,
 }
 
 impl BaobabApp {
-    /// Create a new Baobab App
-    /// # Errors
-    /// Can fail on wasm
-    pub fn try_new(
-        cc: &eframe::CreationContext<'_>,
-        #[cfg(not(target_arch = "wasm32"))] channels: (
-            std::sync::mpsc::Sender<SendType>,
-            std::sync::mpsc::Receiver<SendType>,
-        ),
-        #[cfg(target_arch = "wasm32")] channels: (Option<SendType>, Option<SendType>),
-    ) -> Result<Self, String> {
-        // This is also where you can customize the look and feel of egui using
-        // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
-
-        // Load previous app state (if any).
-        // Note that you must enable the `persistence` feature for this to work.
-        let saved = match cc.storage {
-            Some(store) => eframe::get_value::<String>(store, eframe::APP_KEY),
-            _ => None,
-        };
-        #[cfg(target_arch = "wasm32")]
-        let context = boa_engine::Context::builder()
-            .build()
-            .map_err(|e| format!("Failed to create Boa Context: {}", e))?;
-        Ok(Self {
-            old_values: Default::default(),
-            value: saved.unwrap_or_default(),
-            #[cfg(target_arch = "wasm32")]
-            context,
-            channels,
-        })
-    }
-
     /// Send a command
     pub(crate) fn send_command(&mut self, value: SendType) -> Result<(), String> {
         #[cfg(not(target_arch = "wasm32"))]
         {
-            if let Err(e) = self.channels.0.send(value) {
+            let Some(channels) = &self.channels else {
+                return Err("No channels".to_string());
+            };
+            if let Err(e) = channels.0.send(value) {
                 return Err(format!("Failed to send code to JS engine: {}", e));
             }
             Ok(())
@@ -102,7 +80,10 @@ impl BaobabApp {
     pub(crate) fn receive_result(&mut self) -> Option<SendType> {
         #[cfg(not(target_arch = "wasm32"))]
         {
-            self.channels.1.try_recv().ok()
+            let Some(channels) = &self.channels else {
+                return None;
+            };
+            channels.1.try_recv().ok()
         }
         #[cfg(target_arch = "wasm32")]
         self.channels.1.take()
@@ -147,7 +128,7 @@ impl BaobabApp {
 
     /// run the baobab in wasm
     #[cfg(target_arch = "wasm32")]
-    pub(crate) fn run_baobab(&mut self, ctx: egui::Context) {
+    pub(crate) fn run_baobab(&mut self, ctx: &egui::Context, error_manager: &mut ErrorManager) {
         let Some(value) = self.receive_command() else {
             return;
         };
@@ -163,8 +144,8 @@ impl BaobabApp {
                     }
                     Err(e) => e.to_string(),
                 };
-                if let Err(_e) = self.send_result(SendType::Result(val)) {
-                    // TODO handle
+                if let Err(err) = self.send_result(SendType::Result(val)) {
+                    error_manager.add_error(err);
                 }
             }
             _ => {}
@@ -172,33 +153,76 @@ impl BaobabApp {
     }
 }
 
-impl eframe::App for BaobabApp {
-    fn save(&mut self, storage: &mut dyn eframe::Storage) {
-        eframe::set_value(storage, eframe::APP_KEY, &self.value);
+impl BladvakApp<'_> for BaobabApp {
+    fn try_new_with_args(
+        saved_state: Self,
+        _cc: &eframe::CreationContext<'_>,
+        _args: &[String],
+        _error_manager: &mut bladvak::ErrorManager,
+    ) -> Result<Self, bladvak::AppError> {
+        let Self {
+            old_values, value, ..
+        } = saved_state;
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            use std::sync::mpsc::channel;
+            let (send_js, recv_js) = channel::<SendType>();
+            let (send_res, recv_red) = channel::<SendType>();
+
+            let handle = BaobabApp::run_baobab_thread(recv_js, send_res);
+            drop(handle);
+            let channels = Some((send_js, recv_red));
+            Ok(Self {
+                old_values,
+                value,
+                channels,
+            })
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            let context = boa_engine::Context::builder()
+                .build()
+                .map_err(|e| format!("Failed to create Boa Context: {}", e))?;
+            let channels = (None, None);
+            Ok(Self {
+                old_values,
+                value,
+                #[cfg(target_arch = "wasm32")]
+                context,
+                channels,
+            })
+        }
     }
 
-    /// Called each time the UI needs repainting, which may be many times per second.
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
-            // The top panel is often a good place for a menu bar:
+    fn top_panel(&mut self, _ui: &mut egui::Ui, _error_manager: &mut bladvak::ErrorManager) {}
 
-            egui::MenuBar::new().ui(ui, |ui| {
-                // NOTE: no File->Quit on web pages!
-                let is_web = cfg!(target_arch = "wasm32");
-                if !is_web {
-                    ui.menu_button("File", |ui| {
-                        if ui.button("Quit").clicked() {
-                            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
-                        }
-                    });
-                    ui.add_space(16.0);
-                }
+    fn handle_file(&mut self, _bytes: bladvak::File) -> Result<(), bladvak::AppError> {
+        Ok(())
+    }
 
-                egui::widgets::global_theme_preference_buttons(ui);
-            });
-        });
+    fn menu_file(&mut self, _ui: &mut egui::Ui, _error_manager: &mut bladvak::ErrorManager) {}
+    fn name() -> String {
+        env!("CARGO_PKG_NAME").to_string()
+    }
 
-        egui::TopBottomPanel::bottom("bottom_panel").show(ctx, |ui| {
+    fn version() -> String {
+        env!("CARGO_PKG_VERSION").to_string()
+    }
+
+    fn repo_url() -> String {
+        "https://github.com/Its-Just-Nans/baobab".to_string()
+    }
+
+    fn is_open_button(&self) -> bool {
+        false
+    }
+
+    fn central_panel(
+        &mut self,
+        ui: &mut bladvak::eframe::egui::Ui,
+        error_manager: &mut bladvak::ErrorManager,
+    ) {
+        egui::Panel::bottom("bottom_panel").show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.label(">>");
                 let wid = ui.text_edit_singleline(&mut self.value);
@@ -208,9 +232,10 @@ impl eframe::App for BaobabApp {
                         ">>",
                         self.value.clone()
                     )));
-                    if let Err(_e) = self.send_command(SendType::Code(self.value.clone())) {
-                        //TODO handle error
+                    if let Err(err) = self.send_command(SendType::Code(self.value.clone())) {
+                        error_manager.add_error(err);
                     }
+                    wid.request_focus();
                     self.value.clear();
                 }
                 if ui.input(|i| i.key_pressed(egui::Key::ArrowUp)) {
@@ -232,10 +257,9 @@ impl eframe::App for BaobabApp {
                 if let Some(result) = self.receive_result() {
                     self.old_values.push(result);
                 }
-                wid.request_focus();
             });
         });
-        egui::CentralPanel::default().show(ctx, |ui| {
+        egui::CentralPanel::default().show(ui, |ui| {
             let rect = ui.available_rect_before_wrap();
             let scroll_area = egui::ScrollArea::vertical()
                 .max_height(rect.height())
@@ -254,6 +278,6 @@ impl eframe::App for BaobabApp {
             });
         });
         #[cfg(target_arch = "wasm32")]
-        self.run_baobab(ctx.clone());
+        self.run_baobab(ui.ctx(), error_manager);
     }
 }

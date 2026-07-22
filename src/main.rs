@@ -1,8 +1,9 @@
 #![warn(clippy::all, rust_2018_idioms)]
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
-use baobab::run_baobab;
+use baobab::BaobabApp;
+use bladvak::app::{Bladvak, MainResult};
 
-fn main() -> Result<(), String> {
-    run_baobab().map_err(|e| e.to_string())
+fn main() -> MainResult {
+    Bladvak::<BaobabApp>::bladvak_main()
 }
