@@ -8,7 +8,7 @@ The basic usage is for a quick and easy js playground (for example, bind a keybo
 - <https://github.com/Its-Just-Nans/baobab> - repo
 - <https://crates.io/crates/baobab> - crate
 
-![baobab logo](http://baobab.n4n5.dev/baobab.png)
+![baobab logo](http://n4n5.dev/baobab/baobab.png)
 
 ## Usage
 
