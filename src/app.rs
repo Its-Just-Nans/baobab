@@ -227,16 +227,44 @@ impl BladvakApp<'_> for BaobabApp {
                 ui.label(">>");
                 let wid = ui.text_edit_singleline(&mut self.value);
                 if ui.input(|i| i.key_pressed(egui::Key::Enter)) {
-                    self.old_values.push(SendType::Code(format!(
-                        "{} {}",
-                        ">>",
-                        self.value.clone()
-                    )));
-                    if let Err(err) = self.send_command(SendType::Code(self.value.clone())) {
-                        error_manager.add_error(err);
+                    #[cfg(target_arch = "wasm32")]
+                    {
+                        let input = self.value.clone();
+                        self.old_values
+                            .push(SendType::Code(format!("{} {}", ">>", input.clone())));
+                        if let Err(err) = self.send_command(SendType::Code(input)) {
+                            error_manager.add_error(err);
+                        }
+                        wid.request_focus();
+                        self.value.clear();
                     }
-                    wid.request_focus();
-                    self.value.clear();
+                    #[cfg(not(target_arch = "wasm32"))]
+                    {
+                        let input = self.value.clone();
+                        if input == "exit"
+                            || input == "exit;"
+                            || input == "exit()"
+                            || input == "exit();"
+                        {
+                            if let Err(err) = self.send_command(SendType::Quit) {
+                                error_manager.add_error(err);
+                            }
+                            ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
+                            wid.request_focus();
+                            self.value.clear();
+                        } else {
+                            self.old_values.push(SendType::Code(format!(
+                                "{} {}",
+                                ">>",
+                                input.clone()
+                            )));
+                            if let Err(err) = self.send_command(SendType::Code(input)) {
+                                error_manager.add_error(err);
+                            }
+                            wid.request_focus();
+                            self.value.clear();
+                        }
+                    }
                 }
                 if ui.input(|i| i.key_pressed(egui::Key::ArrowUp)) {
                     if let Some(SendType::Code(s)) =

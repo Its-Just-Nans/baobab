@@ -1,6 +1,6 @@
 {
-    "name": "baobab PWA",
-    "short_name": "baobab-pwa",
+    "name": "baobab",
+    "short_name": "baobab",
     "icons": [
         {
             "src": "./assets/icon-256.png",
