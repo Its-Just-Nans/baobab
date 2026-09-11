@@ -540,7 +540,7 @@ dependencies = [
 
 [[package]]
 name = "baobab"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "bladvak",
  "boa_engine",
