@@ -20,6 +20,8 @@ pub enum SendType {
 /// The Baobab App
 #[derive(serde::Serialize, serde::Deserialize, Debug, Default)]
 pub struct BaobabApp {
+    /// first_load
+    first_load: bool,
     /// Current value
     value: String,
     /// Previous values
@@ -173,6 +175,7 @@ impl BladvakApp<'_> for BaobabApp {
             drop(handle);
             let channels = Some((send_js, recv_red));
             Ok(Self {
+                first_load: true,
                 old_values,
                 value,
                 channels,
@@ -185,6 +188,7 @@ impl BladvakApp<'_> for BaobabApp {
                 .map_err(|e| format!("Failed to create Boa Context: {}", e))?;
             let channels = (None, None);
             Ok(Self {
+                first_load: true,
                 old_values,
                 value,
                 #[cfg(target_arch = "wasm32")]
@@ -235,7 +239,6 @@ impl BladvakApp<'_> for BaobabApp {
                         if let Err(err) = self.send_command(SendType::Code(input)) {
                             error_manager.add_error(err);
                         }
-                        wid.request_focus();
                         self.value.clear();
                     }
                     #[cfg(not(target_arch = "wasm32"))]
@@ -250,7 +253,6 @@ impl BladvakApp<'_> for BaobabApp {
                                 error_manager.add_error(err);
                             }
                             ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
-                            wid.request_focus();
                             self.value.clear();
                         } else {
                             self.old_values.push(SendType::Code(format!(
@@ -261,10 +263,13 @@ impl BladvakApp<'_> for BaobabApp {
                             if let Err(err) = self.send_command(SendType::Code(input)) {
                                 error_manager.add_error(err);
                             }
-                            wid.request_focus();
                             self.value.clear();
                         }
                     }
+                    wid.request_focus();
+                }
+                if self.first_load {
+                    wid.request_focus();
                 }
                 if ui.input(|i| i.key_pressed(egui::Key::ArrowUp)) {
                     if let Some(SendType::Code(s)) =
@@ -307,5 +312,8 @@ impl BladvakApp<'_> for BaobabApp {
         });
         #[cfg(target_arch = "wasm32")]
         self.run_baobab(ui.ctx(), error_manager);
+        if self.first_load {
+            self.first_load = false;
+        }
     }
 }
