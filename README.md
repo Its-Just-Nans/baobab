@@ -4,7 +4,7 @@ Baobab is [`boa_cli`](https://crates.io/crates/boa_cli) but in [egui](https://cr
 
 The basic usage is for a quick and easy js playground (for example, bind a keyboard shortcut to `baobab`).
 
-- <https://baobab.n4n5.dev/> - demo
+- <https://n4n5.dev/baobab/> - demo
 - <https://github.com/Its-Just-Nans/baobab> - repo
 - <https://crates.io/crates/baobab> - crate
 
