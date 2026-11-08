@@ -17,8 +17,8 @@ all-features = true
 
 [dependencies]
 boa_engine = "0.22.0"
-tokio = "1.53.1"
-bladvak = "1.4.4"
+tokio = "1.54.1"
+bladvak = "1.5.0"
 serde = { version = "1.0.229", features = ["derive"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
