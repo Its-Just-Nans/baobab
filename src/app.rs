@@ -1,6 +1,6 @@
 //! Baobab App Ui
 
-use bladvak::BladvakApp;
+use bladvak::{BladvakApp, app::BladvakPanel};
 #[cfg(target_arch = "wasm32")]
 use bladvak::ErrorManager;
 use bladvak::eframe;
@@ -225,6 +225,7 @@ impl BladvakApp<'_> for BaobabApp {
         &mut self,
         ui: &mut bladvak::eframe::egui::Ui,
         error_manager: &mut bladvak::ErrorManager,
+        _panel_list: &mut [std::boxed::Box<dyn BladvakPanel<App = Self>>],
     ) {
         egui::Panel::bottom("bottom_panel").show(ui, |ui| {
             ui.horizontal(|ui| {
