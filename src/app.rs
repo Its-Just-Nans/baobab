@@ -1,10 +1,8 @@
 //! Baobab App Ui
 
-use bladvak::{BladvakApp, app::BladvakPanel};
-#[cfg(target_arch = "wasm32")]
-use bladvak::ErrorManager;
-use bladvak::eframe;
 use bladvak::eframe::egui;
+use bladvak::{BladvakApp, app::BladvakPanel};
+use bladvak::{ErrorManager, eframe};
 
 /// Types of messages sent between UI and JS engine
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
@@ -198,13 +196,17 @@ impl BladvakApp<'_> for BaobabApp {
         }
     }
 
-    fn top_panel(&mut self, _ui: &mut egui::Ui, _error_manager: &mut bladvak::ErrorManager) {}
+    fn top_panel(&mut self, _ui: &mut egui::Ui, _error_manager: &mut ErrorManager) {}
 
-    fn handle_file(&mut self, _bytes: bladvak::File) -> Result<(), bladvak::AppError> {
+    fn handle_file(
+        &mut self,
+        _bytes: bladvak::File,
+        _error_manager: &mut ErrorManager,
+    ) -> Result<(), bladvak::AppError> {
         Ok(())
     }
 
-    fn menu_file(&mut self, _ui: &mut egui::Ui, _error_manager: &mut bladvak::ErrorManager) {}
+    fn menu_file(&mut self, _ui: &mut egui::Ui, _error_manager: &mut ErrorManager) {}
     fn name() -> String {
         env!("CARGO_PKG_NAME").to_string()
     }
@@ -223,7 +225,7 @@ impl BladvakApp<'_> for BaobabApp {
 
     fn central_panel(
         &mut self,
-        ui: &mut bladvak::eframe::egui::Ui,
+        ui: &mut egui::Ui,
         error_manager: &mut bladvak::ErrorManager,
         _panel_list: &mut [std::boxed::Box<dyn BladvakPanel<App = Self>>],
     ) {
